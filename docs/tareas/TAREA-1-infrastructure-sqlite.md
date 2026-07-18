@@ -1,10 +1,10 @@
-# 📋 Tarea 1 — [Infrastructure] Persistencia real con SQLite (Prisma o TypeORM)
+# 📋 Tarea 1 — [Infrastructure] Persistencia real con SQLite (Prisma)
 
 **Capa:** `src/infrastructure/` · **Dificultad:** media · **Estado:** pendiente
 
 ## Objetivo
 
-Reemplazar los repositorios **en memoria** por una persistencia real con **SQLite**, usando Prisma o TypeORM (a elección de quien tome la tarea).
+Reemplazar los repositorios **en memoria** por una persistencia real con **SQLite**, usando Prisma.
 
 ## Contexto de arquitectura (leer antes de empezar)
 
@@ -24,7 +24,7 @@ Las implementaciones actuales en memoria sirven de referencia:
 
 ## Checklist
 
-- [ ] Agregar Prisma o TypeORM con SQLite (`pnpm add ...`)
+- [ ] Agregar Prisma  con SQLite (`pnpm add ...`)
 - [ ] Crear `SqliteInstitutionRepository` que implemente `InstitutionRepository`
 - [ ] Crear `SqliteCertificateRepository` que implemente `CertificateRepository` (ojo: el estado REVOCADO, `revokedAt` y `revocationReason` también se persisten)
 - [ ] Registrar las nuevas clases en `src/app.module.ts` cambiando **solo** los `useClass` (ese archivo es el composition root, el único que conoce todas las capas)
