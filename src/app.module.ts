@@ -16,9 +16,10 @@ import { VerifyChainUseCase } from './application/use-cases/verify-chain.use-cas
 import { ListHolderCertificatesUseCase } from './application/use-cases/list-holder-certificates.use-case';
 
 // Infrastructure: implementaciones concretas
-import { InMemoryBlockchainLedger } from './infrastructure/blockchain/in-memory-blockchain.ledger';
-import { InMemoryInstitutionRepository } from './infrastructure/persistence/in-memory-institution.repository';
-import { InMemoryCertificateRepository } from './infrastructure/persistence/in-memory-certificate.repository';
+import { PrismaService } from './infrastructure/prisma/prisma.service';
+import { SqliteBlockchainLedger } from './infrastructure/blockchain/sqlite-blockchain.ledger';
+import { SqliteInstitutionRepository } from './infrastructure/persistence/sqlite-institution.repository';
+import { SqliteCertificateRepository } from './infrastructure/persistence/sqlite-certificate.repository';
 import { SystemClock } from './infrastructure/system-clock';
 
 // Presentation: controladores y filtros
@@ -36,10 +37,13 @@ import { DomainErrorFilter } from './presentation/filters/domain-error.filter';
 @Module({
   controllers: [InstitutionsController, CertificatesController, BlockchainController],
   providers: [
-    // contratos -> implementaciones
-    { provide: INSTITUTION_REPOSITORY, useClass: InMemoryInstitutionRepository },
-    { provide: CERTIFICATE_REPOSITORY, useClass: InMemoryCertificateRepository },
-    { provide: CERTIFICATE_LEDGER, useClass: InMemoryBlockchainLedger },
+    // infraestructura transversal
+    PrismaService,
+
+    // contratos -> implementaciones SQLite
+    { provide: INSTITUTION_REPOSITORY, useClass: SqliteInstitutionRepository },
+    { provide: CERTIFICATE_REPOSITORY, useClass: SqliteCertificateRepository },
+    { provide: CERTIFICATE_LEDGER, useClass: SqliteBlockchainLedger },
     { provide: CLOCK, useClass: SystemClock },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
 

@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Institution {
+  id      String  @id
+  name    String
+  country String
+  active  Boolean @default(true)
+}
+
+model Certificate {
+  verificationCode String    @id
+  institutionId    String
+  holderName       String
+  holderDocument   String
+  degreeTitle      String
+  issuedAt         DateTime
+  status           String    @default("VIGENTE")
+  revokedAt        DateTime?
+  revocationReason String?
+}
+
+model Block {
+  index        Int    @id
+  timestamp    Float
+  data         String
+  previousHash String
+  hash         String
+}
