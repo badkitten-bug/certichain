@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -21,6 +21,7 @@ describe('Flujo completo de CertiChain (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
   });
 
@@ -43,6 +44,13 @@ describe('Flujo completo de CertiChain (e2e)', () => {
       .post('/institutions')
       .send({ name: 'UN', country: 'Perú' })
       .expect(422);
+  });
+
+  it('POST /certificates con body vacío responde 400 (CP-15 — validación HTTP)', () => {
+    return request(app.getHttpServer())
+      .post('/certificates')
+      .send({})
+      .expect(400);
   });
 
   it('emite un certificado anclado en la blockchain', async () => {
