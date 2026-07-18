@@ -1,0 +1,125 @@
+### CertiChain — Flujo completo de demostración
+### Requiere la extensión REST Client de VS Code (humao.rest-client)
+### Inicia el servidor: npm run start:dev
+
+@baseUrl = http://localhost:3000
+
+### ─────────────────────────────────────────────────────────────
+### 1. Registrar una institución
+### ─────────────────────────────────────────────────────────────
+# @name registerInstitution
+POST {{baseUrl}}/institutions
+Content-Type: application/json
+
+{
+  "name": "Universidad Nacional de Ingeniería",
+  "country": "Perú"
+}
+
+### ─────────────────────────────────────────────────────────────
+### 2. Listar todas las instituciones
+### ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/institutions
+
+### ─────────────────────────────────────────────────────────────
+### 3. Emitir un certificado
+###    Reemplaza {{institutionId}} con el id devuelto en el paso 1
+### ─────────────────────────────────────────────────────────────
+@institutionId = {{registerInstitution.response.body.id}}
+
+# @name issueCertificate
+POST {{baseUrl}}/certificates
+Content-Type: application/json
+
+{
+  "institutionId": "{{institutionId}}",
+  "holderName": "María Fernanda Quispe",
+  "holderDocument": "74125836",
+  "degreeTitle": "Ingeniera de Software"
+}
+
+### ─────────────────────────────────────────────────────────────
+### 4. Verificar el certificado (VALIDO)
+###    Reemplaza {{verificationCode}} con el verificationCode del paso 3
+### ─────────────────────────────────────────────────────────────
+@verificationCode = {{issueCertificate.response.body.verificationCode}}
+
+GET {{baseUrl}}/certificates/{{verificationCode}}/verify
+
+### ─────────────────────────────────────────────────────────────
+### 5. Listar certificados del titular por documento
+### ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/holders/74125836/certificates
+
+### ─────────────────────────────────────────────────────────────
+### 6. Revocar el certificado
+### ─────────────────────────────────────────────────────────────
+POST {{baseUrl}}/certificates/{{verificationCode}}/revoke
+Content-Type: application/json
+
+{
+  "institutionId": "{{institutionId}}",
+  "reason": "Error en el nombre del titular"
+}
+
+### ─────────────────────────────────────────────────────────────
+### 7. Verificar el certificado de nuevo (debe responder REVOCADO)
+### ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/certificates/{{verificationCode}}/verify
+
+### ─────────────────────────────────────────────────────────────
+### 8. Auditar la integridad de la blockchain
+### ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/blockchain/verify
+
+### ─────────────────────────────────────────────────────────────
+### 9. Inspeccionar todos los bloques de la cadena
+### ─────────────────────────────────────────────────────────────
+GET {{baseUrl}}/blockchain
+
+### ─────────────────────────────────────────────────────────────
+### Casos de error — validación HTTP (400)
+### ─────────────────────────────────────────────────────────────
+
+### POST /certificates con body vacío → 400 Bad Request
+POST {{baseUrl}}/certificates
+Content-Type: application/json
+
+{}
+
+### POST /institutions sin campos → 400 Bad Request
+POST {{baseUrl}}/institutions
+Content-Type: application/json
+
+{}
+
+### POST /certificates/:code/revoke sin body → 400 Bad Request
+POST {{baseUrl}}/certificates/cualquier-codigo/revoke
+Content-Type: application/json
+
+{}
+
+### ─────────────────────────────────────────────────────────────
+### Casos de error — reglas de negocio del dominio
+### ─────────────────────────────────────────────────────────────
+
+### Verificar certificado inexistente → 404
+GET {{baseUrl}}/certificates/codigo-que-no-existe/verify
+
+### Institución con nombre demasiado corto → 422 (RN-02)
+POST {{baseUrl}}/institutions
+Content-Type: application/json
+
+{
+  "name": "UX",
+  "country": "Perú"
+}
+
+### Intentar revocar con institución incorrecta → 403 (RN-04)
+POST {{baseUrl}}/certificates/{{verificationCode}}/revoke
+Content-Type: application/json
+
+{
+  "institutionId": "otra-institucion-id",
+  "reason": "intento indebido"
+}
