@@ -105,6 +105,6 @@ pnpm run test:e2e      # 12 pruebas del flujo completo por HTTP
 
 ## 👥 Equipo
 
-Steve Gómez · Erickson Soto · [Integrante 3] — Curso de Arquitectura de Software, 2026.
+Steve Gómez · Erickson Soto · Jose Pacco — Curso de Arquitectura de Software, 2026.
 
 Tareas del equipo: [docs/tareas/](docs/tareas/)
