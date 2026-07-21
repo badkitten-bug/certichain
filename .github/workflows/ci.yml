@@ -9,6 +9,9 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "file:./certichain-test.db"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +33,14 @@ jobs:
       # (es decir, si alguien agregó dependencias sin actualizar el lockfile)
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
+
+      # Genera el cliente TypeScript de Prisma a partir del schema
+      - name: Generar cliente Prisma
+        run: pnpm exec prisma generate
+
+      # Aplica las migraciones SQL sobre la base de datos de CI
+      - name: Aplicar migraciones
+        run: pnpm exec prisma migrate deploy
 
       - name: Compilar
         run: pnpm build

@@ -17,6 +17,7 @@ pnpm-debug.log*
 # entorno
 .env
 .env.*
+!.env.example
 
 # cobertura de tests
 coverage/
