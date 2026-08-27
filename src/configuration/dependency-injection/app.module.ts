@@ -1,12 +1,28 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule } from '@nestjs/microservices';
+import { kafkaOptions } from '../messaging/kafka.config';
 
 // Outbound ports (tokens + interfaces)
-import { INSTITUTION_REPOSITORY, InstitutionRepository } from '../../ports/outbound/institution-repository.port';
-import { CERTIFICATE_REPOSITORY, CertificateRepository } from '../../ports/outbound/certificate-repository.port';
+import {
+  INSTITUTION_REPOSITORY,
+  InstitutionRepository,
+} from '../../ports/outbound/institution-repository.port';
+import {
+  CERTIFICATE_REPOSITORY,
+  CertificateRepository,
+} from '../../ports/outbound/certificate-repository.port';
 import { CLOCK, Clock } from '../../ports/outbound/clock.port';
-import { CERTIFICATE_LEDGER, CertificateLedger } from '../../ports/outbound/certificate-ledger.port';
+import {
+  CERTIFICATE_LEDGER,
+  CertificateLedger,
+} from '../../ports/outbound/certificate-ledger.port';
+import {
+  CERTIFICATE_EVENT_PUBLISHER,
+  CertificateEventPublisher,
+} from '../../ports/outbound/certificate-event-publisher.port';
+import { EMAIL_SENDER_PORT } from '../../ports/outbound/email-sender.port';
 
 // Inbound ports (tokens)
 import { REGISTER_INSTITUTION_PORT } from '../../ports/inbound/register-institution.port';
@@ -33,11 +49,17 @@ import { TypeOrmInstitutionAdapter } from '../../adapters/outbound/persistence/t
 import { TypeOrmCertificateAdapter } from '../../adapters/outbound/persistence/typeorm/typeorm-certificate.adapter';
 import { TypeOrmBlockchainAdapter } from '../../adapters/outbound/blockchain/typeorm/typeorm-blockchain.adapter';
 import { SystemClockAdapter } from '../../adapters/outbound/clock/system-clock.adapter';
+import {
+  KafkaCertificateEventPublisherAdapter,
+  KAFKA_CLIENT,
+} from '../../adapters/outbound/messaging/kafka-certificate-event-publisher.adapter';
+import { NodemailerEmailSenderAdapter } from '../../adapters/outbound/email/nodemailer-email-sender.adapter';
 
-// Adapters inbound: controllers REST y filtro de errores
+// Adapters inbound: controllers REST, consumidor Kafka y filtro de errores
 import { InstitutionsController } from '../../adapters/inbound/rest/institutions.controller';
 import { CertificatesController } from '../../adapters/inbound/rest/certificates.controller';
 import { BlockchainController } from '../../adapters/inbound/rest/blockchain.controller';
+import { CertificateEventsController } from '../../adapters/inbound/messaging/certificate-events.controller';
 import { DomainErrorFilter } from '../../adapters/inbound/rest/filters/domain-error.filter';
 
 /**
@@ -49,7 +71,7 @@ import { DomainErrorFilter } from '../../adapters/inbound/rest/filters/domain-er
  *
  * Flujo de dependencias:
  *   Adapters inbound (REST) → ports inbound → core (use-cases)
- *   Core (use-cases) → ports outbound → adapters outbound (TypeORM/PostgreSQL)
+ *   Core (use-cases) → ports outbound → adapters outbound (TypeORM/PostgreSQL, Kafka, SMTP)
  */
 @Module({
   imports: [
@@ -59,14 +81,27 @@ import { DomainErrorFilter } from '../../adapters/inbound/rest/filters/domain-er
       CertificateOrmEntity,
       BlockOrmEntity,
     ]),
+    ClientsModule.register([{ name: KAFKA_CLIENT, ...kafkaOptions() }]),
   ],
-  controllers: [InstitutionsController, CertificatesController, BlockchainController],
+  controllers: [
+    InstitutionsController,
+    CertificatesController,
+    BlockchainController,
+    CertificateEventsController,
+  ],
   providers: [
     // ── Outbound ports → adaptadores TypeORM/PostgreSQL ─────────────────
     { provide: INSTITUTION_REPOSITORY, useClass: TypeOrmInstitutionAdapter },
     { provide: CERTIFICATE_REPOSITORY, useClass: TypeOrmCertificateAdapter },
-    { provide: CERTIFICATE_LEDGER,     useClass: TypeOrmBlockchainAdapter },
-    { provide: CLOCK,                  useClass: SystemClockAdapter },
+    { provide: CERTIFICATE_LEDGER, useClass: TypeOrmBlockchainAdapter },
+    { provide: CLOCK, useClass: SystemClockAdapter },
+
+    // ── Outbound ports → mensajería y correo ─────────────────────────────
+    {
+      provide: CERTIFICATE_EVENT_PUBLISHER,
+      useClass: KafkaCertificateEventPublisherAdapter,
+    },
+    { provide: EMAIL_SENDER_PORT, useClass: NodemailerEmailSenderAdapter },
 
     // ── Error filter global ──────────────────────────────────────────────
     { provide: APP_FILTER, useClass: DomainErrorFilter },
@@ -85,8 +120,23 @@ import { DomainErrorFilter } from '../../adapters/inbound/rest/filters/domain-er
         certificates: CertificateRepository,
         ledger: CertificateLedger,
         clock: Clock,
-      ) => new IssueCertificateUseCase(institutions, certificates, ledger, clock),
-      inject: [INSTITUTION_REPOSITORY, CERTIFICATE_REPOSITORY, CERTIFICATE_LEDGER, CLOCK],
+        eventPublisher: CertificateEventPublisher,
+      ) =>
+        new IssueCertificateUseCase(
+          institutions,
+          certificates,
+          ledger,
+          clock,
+          eventPublisher,
+          process.env.VERIFICATION_BASE_URL ?? 'http://localhost:3000/verify',
+        ),
+      inject: [
+        INSTITUTION_REPOSITORY,
+        CERTIFICATE_REPOSITORY,
+        CERTIFICATE_LEDGER,
+        CLOCK,
+        CERTIFICATE_EVENT_PUBLISHER,
+      ],
     },
     {
       provide: VERIFY_CERTIFICATE_PORT,
@@ -95,7 +145,11 @@ import { DomainErrorFilter } from '../../adapters/inbound/rest/filters/domain-er
         institutions: InstitutionRepository,
         ledger: CertificateLedger,
       ) => new VerifyCertificateUseCase(certificates, institutions, ledger),
-      inject: [CERTIFICATE_REPOSITORY, INSTITUTION_REPOSITORY, CERTIFICATE_LEDGER],
+      inject: [
+        CERTIFICATE_REPOSITORY,
+        INSTITUTION_REPOSITORY,
+        CERTIFICATE_LEDGER,
+      ],
     },
     {
       provide: REVOKE_CERTIFICATE_PORT,

@@ -14,6 +14,7 @@ export interface IssueCertificateInput {
   institutionId: string;
   holderName: string;
   holderDocument: string;
+  holderEmail: string;
   degreeTitle: string;
 }
 

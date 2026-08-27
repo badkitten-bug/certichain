@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterInstitutionRequest {
@@ -28,6 +28,11 @@ export class IssueCertificateRequest {
   @IsString()
   @IsNotEmpty()
   holderDocument: string;
+
+  @ApiProperty({ example: 'maria@example.com', description: 'Correo electrónico del titular, usado para notificarle la emisión' })
+  @IsEmail()
+  @IsNotEmpty()
+  holderEmail: string;
 
   @ApiProperty({ example: 'Ingeniera de Software', description: 'Título del grado o certificación' })
   @IsString()

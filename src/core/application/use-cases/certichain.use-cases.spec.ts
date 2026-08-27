@@ -77,6 +77,7 @@ describe('Casos de uso de CertiChain', () => {
     institutionId: 'inst-1',
     holderName: 'María Fernanda Quispe',
     holderDocument: '74125836',
+    holderEmail: 'maria@example.com',
     degreeTitle: 'Ingeniera de Software',
   };
 
