@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '../guards/auth.guard';
 import { IssueCertificateUseCase } from '../../application/use-cases/issue-certificate.use-case';
 import { ListHolderCertificatesUseCase } from '../../application/use-cases/list-holder-certificates.use-case';
 import { RevokeCertificateUseCase } from '../../application/use-cases/revoke-certificate.use-case';
@@ -20,9 +21,11 @@ export class CertificatesController {
   ) {}
 
   @Post('certificates')
-  @ApiOperation({ summary: 'Emitir un nuevo certificado académico' })
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Emitir un nuevo certificado académico (requiere sesión)' })
   @ApiResponse({ status: 201, description: 'Certificado emitido y anclado en la blockchain' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos (campos requeridos faltantes)' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 404, description: 'Institución no encontrada (RN-01)' })
   @ApiResponse({ status: 409, description: 'Institución inactiva (RN-03)' })
   issue(@Body() body: IssueCertificateRequest) {
@@ -40,10 +43,12 @@ export class CertificatesController {
   }
 
   @Post('certificates/:code/revoke')
-  @ApiOperation({ summary: 'Revocar un certificado emitido' })
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Revocar un certificado emitido (requiere sesión)' })
   @ApiParam({ name: 'code', description: 'Código de verificación del certificado a revocar' })
   @ApiResponse({ status: 201, description: 'Certificado revocado y bloque añadido a la blockchain' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos (campos requeridos faltantes)' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiResponse({ status: 403, description: 'Solo la institución emisora puede revocar (RN-04)' })
   @ApiResponse({ status: 404, description: 'Certificado no encontrado' })
   @ApiResponse({ status: 409, description: 'Certificado ya revocado (RN-05)' })

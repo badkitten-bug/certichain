@@ -1,8 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { configureApp } from './../src/app.setup';
+
+/**
+ * Better Auth es un paquete solo-ESM y Jest corre en CommonJS, así que
+ * se mockean sus módulos para estas pruebas. El flujo de certificados y
+ * el guard (sesión presente / ausente) se ejercitan igual; la integración
+ * real de login social + MFA se verifica manualmente en el navegador.
+ */
+const mockGetSession = jest.fn();
+
+jest.mock('better-auth/node', () => ({
+  toNodeHandler: () => (_req: unknown, res: { status: (c: number) => { end: () => void } }) =>
+    res.status(501).end(),
+  fromNodeHeaders: () => new Headers(),
+}));
+
+jest.mock('./../src/infrastructure/auth/auth', () => ({
+  auth: { api: { getSession: (...args: unknown[]) => mockGetSession(...args) } },
+}));
 
 /**
  * CP-12: prueba de extremo a extremo del flujo completo a través
@@ -11,7 +30,7 @@ import { AppModule } from './../src/app.module';
  * revocar -> verificar (REVOCADO) -> auditar cadena.
  */
 describe('Flujo completo de CertiChain (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
   let institutionId: string;
   let verificationCode: string;
 
@@ -20,16 +39,36 @@ describe('Flujo completo de CertiChain (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+    app = moduleFixture.createNestApplication<NestExpressApplication>({
+      bodyParser: false,
+    });
+    configureApp(app as NestExpressApplication);
     await app.init();
+  });
+
+  beforeEach(() => {
+    // Por defecto hay una sesión válida (usuario logueado); el guard deja pasar.
+    mockGetSession.mockResolvedValue({ user: { id: 'u1' }, session: { id: 's1' } });
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  it('registra una institución', async () => {
+  it('exige sesión para emitir: sin login responde 401', () => {
+    mockGetSession.mockResolvedValueOnce(null); // simula petición sin sesión
+    return request(app.getHttpServer())
+      .post('/certificates')
+      .send({
+        institutionId: 'x',
+        holderName: 'Sin Sesion',
+        holderDocument: '00000000',
+        degreeTitle: 'Intento',
+      })
+      .expect(401);
+  });
+
+  it('registra una institución (autenticado)', async () => {
     const res = await request(app.getHttpServer())
       .post('/institutions')
       .send({ name: 'Universidad Nacional de Ingeniería', country: 'Perú' })
@@ -47,10 +86,7 @@ describe('Flujo completo de CertiChain (e2e)', () => {
   });
 
   it('POST /certificates con body vacío responde 400 (CP-15 — validación HTTP)', () => {
-    return request(app.getHttpServer())
-      .post('/certificates')
-      .send({})
-      .expect(400);
+    return request(app.getHttpServer()).post('/certificates').send({}).expect(400);
   });
 
   it('emite un certificado anclado en la blockchain', async () => {

@@ -48,6 +48,9 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'sqlite' }),
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-secret-cambiar-en-produccion',
+  // Login principal: redes sociales. El email/contraseña queda disponible
+  // como alternativa y para las pruebas automatizadas.
+  emailAndPassword: { enabled: true },
   socialProviders,
   // MFA por TOTP (Google Authenticator), con códigos de respaldo.
   plugins: [twoFactor()],
