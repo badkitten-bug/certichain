@@ -20,6 +20,7 @@ import { InMemoryBlockchainLedger } from './infrastructure/blockchain/in-memory-
 import { InMemoryInstitutionRepository } from './infrastructure/persistence/in-memory-institution.repository';
 import { InMemoryCertificateRepository } from './infrastructure/persistence/in-memory-certificate.repository';
 import { SystemClock } from './infrastructure/system-clock';
+import { DemoSeeder } from './infrastructure/seed/demo-seeder';
 
 // Presentation: controladores y filtros
 import { InstitutionsController } from './presentation/controllers/institutions.controller';
@@ -88,6 +89,17 @@ import { DomainErrorFilter } from './presentation/filters/domain-error.filter';
       useFactory: (certificates: CertificateRepository) =>
         new ListHolderCertificatesUseCase(certificates),
       inject: [CERTIFICATE_REPOSITORY],
+    },
+
+    // Carga datos de demostración al arrancar (se desactiva en tests).
+    {
+      provide: DemoSeeder,
+      useFactory: (
+        register: RegisterInstitutionUseCase,
+        issue: IssueCertificateUseCase,
+        revoke: RevokeCertificateUseCase,
+      ) => new DemoSeeder(register, issue, revoke),
+      inject: [RegisterInstitutionUseCase, IssueCertificateUseCase, RevokeCertificateUseCase],
     },
   ],
 })
