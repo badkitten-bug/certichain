@@ -1,12 +1,18 @@
+import { join } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+
+  // Frontend estático de demostración (public/index.html) servido en la raíz.
+  // Es solo un cliente de la API: no contiene ninguna regla de negocio.
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CertiChain API')

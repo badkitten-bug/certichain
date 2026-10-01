@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CertiChain — Certificados Académicos en Blockchain</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card2: #273549;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --green: #22c55e;
+      --red: #ef4444;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      padding: 28px 20px;
+      text-align: center;
+    }
+    header h1 { font-size: 1.9rem; margin-bottom: 4px; }
+    header p { opacity: 0.9; font-size: 0.95rem; }
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 20px 60px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+    .tab {
+      flex: 1; min-width: 140px; padding: 12px 16px; border: 1px solid var(--border);
+      background: var(--card); color: var(--muted); border-radius: 10px; cursor: pointer;
+      font-size: 0.95rem; font-weight: 600; transition: all 0.15s; text-align: center;
+    }
+    .tab:hover { border-color: var(--accent); color: var(--text); }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .panel { display: none; }
+    .panel.active { display: block; animation: fade 0.2s; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 24px; margin-bottom: 20px;
+    }
+    .card h2 { font-size: 1.2rem; margin-bottom: 4px; }
+    .card .hint { color: var(--muted); font-size: 0.88rem; margin-bottom: 18px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin: 14px 0 6px; color: var(--muted); }
+    input, select {
+      width: 100%; padding: 11px 14px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; color: var(--text); font-size: 0.95rem;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    button.action {
+      margin-top: 20px; width: 100%; padding: 13px; background: var(--accent); color: #fff;
+      border: none; border-radius: 9px; font-size: 1rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    button.action:hover { background: var(--accent-hover); }
+    button.action:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result { margin-top: 18px; border-radius: 10px; padding: 16px; font-size: 0.9rem; display: none; }
+    .result.show { display: block; }
+    .result.ok { background: rgba(34,197,94,0.1); border: 1px solid var(--green); }
+    .result.err { background: rgba(239,68,68,0.1); border: 1px solid var(--red); }
+    .result.warn { background: rgba(245,158,11,0.1); border: 1px solid var(--amber); }
+    .result pre { white-space: pre-wrap; word-break: break-all; font-size: 0.82rem; color: var(--muted); margin-top: 10px; }
+    .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem; }
+    .badge.VALIDO { background: var(--green); color: #052e16; }
+    .badge.REVOCADO { background: var(--amber); color: #422006; }
+    .badge.ALTERADO, .badge.ERROR { background: var(--red); color: #450a0a; }
+    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; margin-top: 12px; }
+    .kv span:nth-child(odd) { color: var(--muted); font-size: 0.82rem; }
+    .kv span:nth-child(even) { font-size: 0.9rem; word-break: break-word; }
+    .code-pill {
+      background: var(--card2); border: 1px dashed var(--accent); padding: 8px 12px; border-radius: 8px;
+      font-family: monospace; font-size: 0.85rem; margin-top: 8px; cursor: pointer; display: inline-block;
+    }
+    .chain-block {
+      background: var(--card2); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; font-size: 0.82rem;
+    }
+    .chain-block .idx { font-weight: 700; color: var(--accent); }
+    .chain-block .hash { font-family: monospace; color: var(--muted); word-break: break-all; font-size: 0.75rem; }
+    .empty { color: var(--muted); text-align: center; padding: 20px; font-size: 0.9rem; }
+    .footer-links { text-align: center; margin-top: 10px; }
+    .footer-links a { color: var(--accent); font-size: 0.85rem; text-decoration: none; margin: 0 8px; }
+    .footer-links a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎓 CertiChain</h1>
+    <p>Registro y verificación de certificados académicos en blockchain</p>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <div class="tab active" data-tab="verify">🔎 Verificar certificado</div>
+      <div class="tab" data-tab="issue">🏛️ Emitir (institución)</div>
+      <div class="tab" data-tab="chain">⛓️ Auditar cadena</div>
+    </div>
+
+    <!-- ============ VERIFICAR ============ -->
+    <div class="panel active" id="panel-verify">
+      <div class="card">
+        <h2>Verificar un certificado</h2>
+        <p class="hint">Cualquier empresa puede comprobar la autenticidad con el código de verificación. No requiere permiso de la institución.</p>
+        <label>Código de verificación</label>
+        <input id="verify-code" placeholder="Pega aquí el código del certificado" />
+        <button class="action" onclick="verify()">Verificar</button>
+        <div class="result" id="verify-result"></div>
+      </div>
+    </div>
+
+    <!-- ============ EMITIR ============ -->
+    <div class="panel" id="panel-issue">
+      <div class="card">
+        <h2>Paso 1 · Registrar institución</h2>
+        <p class="hint">Solo una institución registrada y activa puede emitir certificados (RN-01).</p>
+        <label>Nombre de la institución</label>
+        <input id="inst-name" placeholder="Universidad Nacional de Ingeniería" />
+        <label>País</label>
+        <input id="inst-country" placeholder="Perú" />
+        <button class="action" onclick="registerInstitution()">Registrar institución</button>
+        <div class="result" id="inst-result"></div>
+      </div>
+
+      <div class="card">
+        <h2>Paso 2 · Emitir certificado</h2>
+        <p class="hint">Se calcula el hash SHA-256 del certificado y se ancla como bloque en la cadena.</p>
+        <label>Institución emisora</label>
+        <select id="cert-institution"><option value="">— registra una institución primero —</option></select>
+        <label>Nombre del titular</label>
+        <input id="cert-holder" placeholder="María Fernanda Quispe" />
+        <label>Documento del titular</label>
+        <input id="cert-document" placeholder="74125836" />
+        <label>Título otorgado</label>
+        <input id="cert-degree" placeholder="Ingeniera de Software" />
+        <button class="action" onclick="issue()">Emitir certificado</button>
+        <div class="result" id="issue-result"></div>
+      </div>
+    </div>
+
+    <!-- ============ CADENA ============ -->
+    <div class="panel" id="panel-chain">
+      <div class="card">
+        <h2>Auditoría de la blockchain</h2>
+        <p class="hint">Recorre la cadena verificando que ningún bloque haya sido alterado (RN-09).</p>
+        <button class="action" onclick="loadChain()">Actualizar y auditar</button>
+        <div class="result" id="audit-result"></div>
+        <div id="chain-list" style="margin-top:18px;"></div>
+      </div>
+    </div>
+
+    <div class="footer-links">
+      <a href="/api" target="_blank">📄 Documentación Swagger</a>
+      <a href="/blockchain" target="_blank">Ver cadena (JSON)</a>
+    </div>
+  </div>
+
+  <script>
+    // Tabs
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+        if (tab.dataset.tab === 'issue') loadInstitutions();
+        if (tab.dataset.tab === 'chain') loadChain();
+      };
+    });
+
+    function show(id, cls, html) {
+      const el = document.getElementById(id);
+      el.className = 'result show ' + cls;
+      el.innerHTML = html;
+    }
+
+    async function api(method, path, body) {
+      const res = await fetch(path, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    // ---- Instituciones ----
+    async function registerInstitution() {
+      const name = document.getElementById('inst-name').value.trim();
+      const country = document.getElementById('inst-country').value.trim();
+      if (!name || !country) return show('inst-result', 'err', '⚠️ Completa nombre y país.');
+      const { ok, data } = await api('POST', '/institutions', { name, country });
+      if (ok) {
+        show('inst-result', 'ok', '✅ Institución registrada.<div class="kv"><span>ID</span><span>' + data.id + '</span><span>Nombre</span><span>' + data.name + '</span></div>');
+        document.getElementById('inst-name').value = '';
+        document.getElementById('inst-country').value = '';
+        loadInstitutions(data.id);
+      } else {
+        show('inst-result', 'err', '❌ ' + (data.message || 'Error') );
+      }
+    }
+
+    async function loadInstitutions(selectId) {
+      const { ok, data } = await api('GET', '/institutions');
+      const sel = document.getElementById('cert-institution');
+      if (!ok || !Array.isArray(data) || data.length === 0) {
+        sel.innerHTML = '<option value="">— registra una institución primero —</option>';
+        return;
+      }
+      sel.innerHTML = data.map((i) => '<option value="' + i.id + '">' + i.name + ' (' + i.country + ')</option>').join('');
+      if (selectId) sel.value = selectId;
+    }
+
+    // ---- Emitir ----
+    async function issue() {
+      const institutionId = document.getElementById('cert-institution').value;
+      const holderName = document.getElementById('cert-holder').value.trim();
+      const holderDocument = document.getElementById('cert-document').value.trim();
+      const degreeTitle = document.getElementById('cert-degree').value.trim();
+      if (!institutionId) return show('issue-result', 'err', '⚠️ Selecciona una institución (regístrala en el Paso 1).');
+      if (!holderName || !holderDocument || !degreeTitle) return show('issue-result', 'err', '⚠️ Completa todos los datos del titular.');
+
+      const { ok, data } = await api('POST', '/certificates', { institutionId, holderName, holderDocument, degreeTitle });
+      if (ok) {
+        show('issue-result', 'ok',
+          '✅ Certificado emitido y anclado en el bloque #' + data.blockIndex +
+          '.<div class="hint" style="margin:10px 0 4px">Código de verificación (haz clic para copiar):</div>' +
+          '<div class="code-pill" onclick="copyCode(this)">' + data.verificationCode + '</div>' +
+          '<div class="kv"><span>Hash SHA-256</span><span style="font-family:monospace;font-size:0.75rem">' + data.contentHash + '</span></div>');
+        document.getElementById('cert-holder').value = '';
+        document.getElementById('cert-document').value = '';
+        document.getElementById('cert-degree').value = '';
+      } else {
+        show('issue-result', 'err', '❌ ' + (Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Error'));
+      }
+    }
+
+    function copyCode(el) {
+      navigator.clipboard.writeText(el.textContent);
+      const orig = el.textContent;
+      el.textContent = '✓ copiado';
+      setTimeout(() => (el.textContent = orig), 1000);
+    }
+
+    // ---- Verificar ----
+    async function verify() {
+      const code = document.getElementById('verify-code').value.trim();
+      if (!code) return show('verify-result', 'err', '⚠️ Ingresa un código de verificación.');
+      const { ok, status, data } = await api('GET', '/certificates/' + encodeURIComponent(code) + '/verify');
+      if (status === 404) return show('verify-result', 'err', '<span class="badge ERROR">NO ENCONTRADO</span><div class="hint" style="margin-top:10px">No existe ningún certificado con ese código.</div>');
+      if (!ok) return show('verify-result', 'err', '❌ ' + (data.message || 'Error'));
+
+      if (data.verdict === 'VALIDO') {
+        show('verify-result', 'ok',
+          '<span class="badge VALIDO">✓ VÁLIDO</span>' +
+          '<div class="kv"><span>Titular</span><span>' + data.certificate.holderName + '</span>' +
+          '<span>Título</span><span>' + data.certificate.degreeTitle + '</span>' +
+          '<span>Institución</span><span>' + data.certificate.institution + '</span>' +
+          '<span>Emitido</span><span>' + new Date(data.certificate.issuedAt).toLocaleString('es-PE') + '</span>' +
+          '<span>Anclado en</span><span>Bloque #' + data.proof.blockIndex + ' · cadena íntegra ✓</span></div>');
+      } else if (data.verdict === 'REVOCADO') {
+        show('verify-result', 'warn',
+          '<span class="badge REVOCADO">⚠ REVOCADO</span>' +
+          '<div class="kv"><span>Revocado el</span><span>' + new Date(data.revokedAt).toLocaleString('es-PE') + '</span>' +
+          '<span>Motivo</span><span>' + (data.reason || '—') + '</span></div>');
+      } else {
+        show('verify-result', 'err',
+          '<span class="badge ALTERADO">✗ ALTERADO</span>' +
+          '<div class="hint" style="margin-top:10px">El contenido no coincide con el hash anclado o la cadena fue manipulada.</div>');
+      }
+    }
+
+    // ---- Cadena ----
+    async function loadChain() {
+      const audit = await api('GET', '/blockchain/verify');
+      if (audit.data.valid) {
+        show('audit-result', 'ok', '✅ Cadena íntegra · ' + audit.data.totalBlocks + ' bloques (incluye el génesis).');
+      } else {
+        show('audit-result', 'err', '❌ Cadena corrupta a partir del bloque #' + audit.data.corruptedAtIndex + '.');
+      }
+      const chain = await api('GET', '/blockchain');
+      const list = document.getElementById('chain-list');
+      if (!Array.isArray(chain.data) || chain.data.length === 0) {
+        list.innerHTML = '<div class="empty">La cadena está vacía.</div>';
+        return;
+      }
+      list.innerHTML = chain.data.map((b) => {
+        let label = 'Génesis';
+        try { const ev = JSON.parse(b.data); label = ev.type === 'EMISION' ? '📜 Emisión' : ev.type === 'REVOCACION' ? '🚫 Revocación' : b.data; } catch (e) {}
+        return '<div class="chain-block"><span class="idx">Bloque #' + b.index + '</span> — ' + label +
+          '<div class="hash">hash: ' + b.hash + '</div>' +
+          '<div class="hash">prev: ' + b.previousHash + '</div></div>';
+      }).join('');
+    }
+  </script>
+</body>
+</html>
