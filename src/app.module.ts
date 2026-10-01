@@ -102,8 +102,14 @@ import { DomainErrorFilter } from './presentation/filters/domain-error.filter';
         register: RegisterInstitutionUseCase,
         issue: IssueCertificateUseCase,
         revoke: RevokeCertificateUseCase,
-      ) => new DemoSeeder(register, issue, revoke),
-      inject: [RegisterInstitutionUseCase, IssueCertificateUseCase, RevokeCertificateUseCase],
+        institutions: InstitutionRepository,
+      ) => new DemoSeeder(register, issue, revoke, institutions),
+      inject: [
+        RegisterInstitutionUseCase,
+        IssueCertificateUseCase,
+        RevokeCertificateUseCase,
+        INSTITUTION_REPOSITORY,
+      ],
     },
   ],
 })

@@ -1,7 +1,9 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { RegisterInstitutionUseCase } from '../../application/use-cases/register-institution.use-case';
 import { IssueCertificateUseCase } from '../../application/use-cases/issue-certificate.use-case';
 import { RevokeCertificateUseCase } from '../../application/use-cases/revoke-certificate.use-case';
+import { INSTITUTION_REPOSITORY } from '../../domain/repositories/institution.repository';
+import type { InstitutionRepository } from '../../domain/repositories/institution.repository';
 
 /**
  * Puebla la aplicación con datos de demostración al arrancar, para que
@@ -19,6 +21,8 @@ export class DemoSeeder implements OnApplicationBootstrap {
     private readonly registerInstitution: RegisterInstitutionUseCase,
     private readonly issueCertificate: IssueCertificateUseCase,
     private readonly revokeCertificate: RevokeCertificateUseCase,
+    @Inject(INSTITUTION_REPOSITORY)
+    private readonly institutions: InstitutionRepository,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -36,6 +40,15 @@ export class DemoSeeder implements OnApplicationBootstrap {
   }
 
   private async seed(): Promise<void> {
+    // Idempotencia: con persistencia (SQLite) la BD sobrevive al reinicio,
+    // así que solo sembramos cuando está vacía para no duplicar datos.
+    const existing = await this.institutions.findAll();
+    if (existing.length > 0) {
+      this.logger.log(
+        `Datos ya presentes (${existing.length} instituciones): se omite la carga de demostración.`,
+      );
+      return;
+    }
 
     const institutions = [
       { name: 'Universidad Nacional de Ingeniería', country: 'Perú' },
