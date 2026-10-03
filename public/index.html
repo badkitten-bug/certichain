@@ -91,6 +91,34 @@
     .footer-links { text-align: center; margin-top: 10px; }
     .footer-links a { color: var(--accent); font-size: 0.85rem; text-decoration: none; margin: 0 8px; }
     .footer-links a:hover { text-decoration: underline; }
+
+    /* Barra de sesión */
+    .authbar {
+      max-width: 960px; margin: 16px auto 0; padding: 0 20px;
+      display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+    }
+    .authbar .who { margin-right: auto; color: var(--muted); font-size: 0.9rem; }
+    .authbar .who b { color: var(--text); }
+    .btn {
+      padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border); background: var(--card);
+      color: var(--text); font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn.google { background: #fff; color: #1f2937; border-color: #fff; }
+    .btn.github { background: #24292e; color: #fff; border-color: #24292e; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.ghost { background: transparent; }
+    .mfa-badge { font-size: 0.78rem; padding: 2px 10px; border-radius: 999px; background: var(--green); color: #052e16; font-weight: 700; }
+    .auth-panel {
+      max-width: 960px; margin: 12px auto 0; padding: 18px 20px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 12px;
+    }
+    .auth-panel.hidden { display: none; }
+    .auth-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .auth-row input { flex: 1; min-width: 160px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
+    .auth-sep { text-align: center; color: var(--muted); font-size: 0.8rem; margin: 12px 0 8px; }
+    #qr { display: flex; justify-content: center; margin: 14px 0; background: #fff; padding: 12px; border-radius: 10px; width: fit-content; margin-left: auto; margin-right: auto; }
+    .secret { font-family: monospace; font-size: 0.8rem; color: var(--muted); word-break: break-all; text-align: center; }
   </style>
 </head>
 <body>
@@ -98,6 +126,53 @@
     <h1>🎓 CertiChain</h1>
     <p>Registro y verificación de certificados académicos en blockchain</p>
   </header>
+
+  <!-- Barra de sesión (autenticación) -->
+  <div class="authbar" id="authbar">
+    <span class="who" id="who">Cargando sesión…</span>
+    <!-- Botones cuando NO hay sesión -->
+    <span id="logged-out" style="display:none;">
+      <button class="btn google" onclick="social('google')">Entrar con Google</button>
+      <button class="btn github" onclick="social('github')">Entrar con GitHub</button>
+      <button class="btn ghost" onclick="togglePanel('email')">Email</button>
+    </span>
+    <!-- Botones cuando SÍ hay sesión -->
+    <span id="logged-in" style="display:none;">
+      <button class="btn ghost" onclick="togglePanel('mfa')">🔐 Configurar MFA</button>
+      <button class="btn" onclick="signout()">Cerrar sesión</button>
+    </span>
+  </div>
+
+  <!-- Panel: login por email (permite demostrar MFA) -->
+  <div class="auth-panel hidden" id="panel-email">
+    <div class="auth-row">
+      <input id="em-name" placeholder="Nombre (solo para registrarse)" />
+      <input id="em-email" type="email" placeholder="correo@ejemplo.com" />
+      <input id="em-pass" type="password" placeholder="Contraseña (mín. 8)" />
+    </div>
+    <div class="auth-row" style="margin-top:10px; justify-content:flex-end;">
+      <button class="btn ghost" onclick="emailAuth('sign-up')">Registrarme</button>
+      <button class="btn primary" onclick="emailAuth('sign-in')">Entrar</button>
+    </div>
+    <div class="result" id="email-result"></div>
+  </div>
+
+  <!-- Panel: enrolar MFA (TOTP / Google Authenticator) -->
+  <div class="auth-panel hidden" id="panel-mfa">
+    <h2 style="font-size:1.05rem; margin-bottom:6px;">Activar MFA con Google Authenticator</h2>
+    <p class="hint">Escanea el QR con Google Authenticator (o ingresa la clave manual) y luego confirma el código de 6 dígitos.</p>
+    <div class="auth-row">
+      <input id="mfa-pass" type="password" placeholder="Tu contraseña (confirmación)" />
+      <button class="btn primary" onclick="startMfa()">Generar QR</button>
+    </div>
+    <div id="qr"></div>
+    <div class="secret" id="mfa-secret"></div>
+    <div class="auth-row" id="mfa-verify-row" style="margin-top:12px; display:none;">
+      <input id="mfa-code" placeholder="Código de 6 dígitos" inputmode="numeric" />
+      <button class="btn primary" onclick="verifyMfa()">Confirmar y activar</button>
+    </div>
+    <div class="result" id="mfa-result"></div>
+  </div>
 
   <div class="container">
     <div class="tabs">
@@ -159,12 +234,113 @@
     </div>
 
     <div class="footer-links">
-      <a href="/api" target="_blank">📄 Documentación Swagger</a>
+      <a href="/docs" target="_blank">📄 Documentación Swagger</a>
       <a href="/blockchain" target="_blank">Ver cadena (JSON)</a>
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
+    // ===================== Autenticación (Better Auth) =====================
+    const AUTH = '/api/auth';
+
+    async function authApi(path, body) {
+      const res = await fetch(AUTH + path, {
+        method: body ? 'POST' : 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    function togglePanel(which) {
+      ['email', 'mfa'].forEach((p) => {
+        const el = document.getElementById('panel-' + p);
+        if (p === which) el.classList.toggle('hidden');
+        else el.classList.add('hidden');
+      });
+    }
+
+    async function loadSession() {
+      const { data } = await authApi('/get-session');
+      const session = data && data.user ? data : null;
+      const who = document.getElementById('who');
+      const out = document.getElementById('logged-out');
+      const inn = document.getElementById('logged-in');
+      if (session) {
+        const u = session.user;
+        const mfa = u.twoFactorEnabled ? ' <span class="mfa-badge">MFA activo</span>' : '';
+        who.innerHTML = 'Sesión: <b>' + (u.name || u.email) + '</b>' + mfa;
+        out.style.display = 'none';
+        inn.style.display = 'inline';
+      } else {
+        who.textContent = 'No has iniciado sesión';
+        out.style.display = 'inline';
+        inn.style.display = 'none';
+      }
+    }
+
+    async function social(provider) {
+      const { ok, data } = await authApi('/sign-in/social', { provider, callbackURL: '/' });
+      if (ok && data.url) {
+        window.location.href = data.url; // redirige al proveedor OAuth
+      } else {
+        alert('No se pudo iniciar el login social. ¿Configuraste las credenciales OAuth en el .env?');
+      }
+    }
+
+    async function emailAuth(mode) {
+      const name = document.getElementById('em-name').value.trim();
+      const email = document.getElementById('em-email').value.trim();
+      const password = document.getElementById('em-pass').value;
+      const body = mode === 'sign-up' ? { name: name || email, email, password } : { email, password };
+      const { ok, data } = await authApi('/' + mode + '/email', body);
+      if (ok) {
+        show('email-result', 'ok', '✅ Sesión iniciada.');
+        togglePanel('email');
+        await loadSession();
+      } else {
+        show('email-result', 'err', '❌ ' + (data.message || 'No se pudo autenticar'));
+      }
+    }
+
+    async function signout() {
+      await authApi('/sign-out', {});
+      await loadSession();
+    }
+
+    async function startMfa() {
+      const password = document.getElementById('mfa-pass').value;
+      if (!password) return show('mfa-result', 'err', '⚠️ Ingresa tu contraseña.');
+      const { ok, data } = await authApi('/two-factor/enable', { password });
+      if (!ok) {
+        return show('mfa-result', 'err', '❌ ' + (data.message || 'No se pudo iniciar el MFA (los usuarios sociales no tienen contraseña; usa una cuenta de email para la demo de MFA)'));
+      }
+      const qr = document.getElementById('qr');
+      qr.innerHTML = '';
+      new QRCode(qr, { text: data.totpURI, width: 180, height: 180 });
+      document.getElementById('mfa-secret').textContent = data.totpURI;
+      document.getElementById('mfa-verify-row').style.display = 'flex';
+      show('mfa-result', 'ok', 'Escanea el QR en Google Authenticator y confirma el código.');
+    }
+
+    async function verifyMfa() {
+      const code = document.getElementById('mfa-code').value.trim();
+      const { ok, data } = await authApi('/two-factor/verify-totp', { code });
+      if (ok) {
+        show('mfa-result', 'ok', '✅ MFA activado correctamente.');
+        document.getElementById('panel-mfa').classList.add('hidden');
+        await loadSession();
+      } else {
+        show('mfa-result', 'err', '❌ Código incorrecto. ' + (data.message || ''));
+      }
+    }
+
+    loadSession();
+
+    // ===================== App (certificados) =====================
     // Tabs
     document.querySelectorAll('.tab').forEach((tab) => {
       tab.onclick = () => {
