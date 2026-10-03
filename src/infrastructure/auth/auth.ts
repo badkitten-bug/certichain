@@ -44,8 +44,11 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   };
 }
 
+// Motor de BD: sqlite en local/CI, postgresql en el contenedor (staging).
+const dbProvider = (process.env.DB_PROVIDER ?? 'sqlite') as 'sqlite' | 'postgresql';
+
 export const auth = betterAuth({
-  database: prismaAdapter(prisma, { provider: 'sqlite' }),
+  database: prismaAdapter(prisma, { provider: dbProvider }),
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
   secret: process.env.BETTER_AUTH_SECRET ?? 'dev-secret-cambiar-en-produccion',
   // Login principal: redes sociales. El email/contraseña queda disponible

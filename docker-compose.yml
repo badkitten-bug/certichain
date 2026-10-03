@@ -1,0 +1,71 @@
+# Stack completo de CertiChain para staging (Dokploy) o para probar
+# localmente el entorno "como producción": API + worker + PostgreSQL + RabbitMQ.
+#
+# En Dokploy puedes usar este compose tal cual, o apuntar DATABASE_URL a un
+# PostgreSQL gestionado por Dokploy (y quitar el servicio `postgres`).
+#
+# NOTA: para el desarrollo diario NO necesitas esto; usa `pnpm start:dev`
+# (SQLite). Este compose es para el despliegue / pruebas de integración.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: certichain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-certichain}
+      POSTGRES_DB: certichain
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U certichain']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - '15672:15672' # UI de administración (http://localhost:15672, user/pass: guest)
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: certichain:latest
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://certichain:${POSTGRES_PASSWORD:-certichain}@postgres:5432/certichain
+      DB_PROVIDER: postgresql
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-cambia-este-secreto}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    image: certichain:latest
+    command: node dist/consumer.js
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+    depends_on:
+      app:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  rabbitmqdata:

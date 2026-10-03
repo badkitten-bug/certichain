@@ -5,6 +5,7 @@ import { CertificateRepository } from '../../domain/repositories/certificate.rep
 import { InstitutionRepository } from '../../domain/repositories/institution.repository';
 import { Clock } from '../ports/clock.port';
 import { CertificateLedger } from '../ports/certificate-ledger.port';
+import { EventPublisher } from '../ports/event-publisher.port';
 import {
   IssueCertificateInput,
   IssueCertificateOutput,
@@ -24,6 +25,7 @@ export class IssueCertificateUseCase {
     private readonly certificates: CertificateRepository,
     private readonly ledger: CertificateLedger,
     private readonly clock: Clock,
+    private readonly events: EventPublisher,
   ) {}
 
   async execute(input: IssueCertificateInput): Promise<IssueCertificateOutput> {
@@ -52,6 +54,16 @@ export class IssueCertificateUseCase {
     const block = await this.ledger.append(JSON.stringify(event));
 
     await this.certificates.save(certificate);
+
+    // Evento de integración: otros servicios (notificaciones, auditoría…)
+    // reaccionan de forma asíncrona vía el broker.
+    await this.events.publish({
+      type: 'certificate.issued',
+      verificationCode: certificate.verificationCode,
+      institutionId: institution.id,
+      contentHash: certificate.contentHash,
+      at: certificate.issuedAt.toISOString(),
+    });
 
     return {
       verificationCode: certificate.verificationCode,

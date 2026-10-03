@@ -8,6 +8,7 @@ import { CERTIFICATE_REPOSITORY, CertificateRepository } from './domain/reposito
 // Application: casos de uso y puertos
 import { CLOCK, Clock } from './application/ports/clock.port';
 import { CERTIFICATE_LEDGER, CertificateLedger } from './application/ports/certificate-ledger.port';
+import { EVENT_PUBLISHER, EventPublisher } from './application/ports/event-publisher.port';
 import { RegisterInstitutionUseCase } from './application/use-cases/register-institution.use-case';
 import { IssueCertificateUseCase } from './application/use-cases/issue-certificate.use-case';
 import { VerifyCertificateUseCase } from './application/use-cases/verify-certificate.use-case';
@@ -22,6 +23,8 @@ import { SqliteInstitutionRepository } from './infrastructure/persistence/sqlite
 import { SqliteCertificateRepository } from './infrastructure/persistence/sqlite-certificate.repository';
 import { SystemClock } from './infrastructure/system-clock';
 import { DemoSeeder } from './infrastructure/seed/demo-seeder';
+import { NoopEventPublisher } from './infrastructure/messaging/noop-event-publisher';
+import { RabbitMqEventPublisher } from './infrastructure/messaging/rabbitmq-event-publisher';
 
 // Presentation: controladores y filtros
 import { InstitutionsController } from './presentation/controllers/institutions.controller';
@@ -48,6 +51,16 @@ import { DomainErrorFilter } from './presentation/filters/domain-error.filter';
     { provide: CLOCK, useClass: SystemClock },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
 
+    // Publicador de eventos: RabbitMQ si hay RABBITMQ_URL; si no, "noop"
+    // (local y CI no necesitan broker para funcionar).
+    {
+      provide: EVENT_PUBLISHER,
+      useFactory: (): EventPublisher =>
+        process.env.RABBITMQ_URL
+          ? new RabbitMqEventPublisher(process.env.RABBITMQ_URL)
+          : new NoopEventPublisher(),
+    },
+
     // casos de uso: clases puras, se construyen inyectando los contratos
     {
       provide: RegisterInstitutionUseCase,
@@ -62,8 +75,9 @@ import { DomainErrorFilter } from './presentation/filters/domain-error.filter';
         certificates: CertificateRepository,
         ledger: CertificateLedger,
         clock: Clock,
-      ) => new IssueCertificateUseCase(institutions, certificates, ledger, clock),
-      inject: [INSTITUTION_REPOSITORY, CERTIFICATE_REPOSITORY, CERTIFICATE_LEDGER, CLOCK],
+        events: EventPublisher,
+      ) => new IssueCertificateUseCase(institutions, certificates, ledger, clock, events),
+      inject: [INSTITUTION_REPOSITORY, CERTIFICATE_REPOSITORY, CERTIFICATE_LEDGER, CLOCK, EVENT_PUBLISHER],
     },
     {
       provide: VerifyCertificateUseCase,
@@ -80,8 +94,9 @@ import { DomainErrorFilter } from './presentation/filters/domain-error.filter';
         certificates: CertificateRepository,
         ledger: CertificateLedger,
         clock: Clock,
-      ) => new RevokeCertificateUseCase(certificates, ledger, clock),
-      inject: [CERTIFICATE_REPOSITORY, CERTIFICATE_LEDGER, CLOCK],
+        events: EventPublisher,
+      ) => new RevokeCertificateUseCase(certificates, ledger, clock, events),
+      inject: [CERTIFICATE_REPOSITORY, CERTIFICATE_LEDGER, CLOCK, EVENT_PUBLISHER],
     },
     {
       provide: VerifyChainUseCase,

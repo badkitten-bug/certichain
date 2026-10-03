@@ -5,6 +5,16 @@
 Aplicación desarrollada con **Arquitectura Onion (Cebolla)** usando **TypeScript + NestJS**.
 
 > 📘 Documento completo de análisis y diseño: [docs/Analisis-y-Diseno-CertiChain.md](docs/Analisis-y-Diseno-CertiChain.md)
+> 🚀 Guía de despliegue (Dokploy, Postgres, RabbitMQ): [docs/DEPLOY.md](docs/DEPLOY.md)
+
+## 🧩 Mensajería de eventos (RabbitMQ)
+
+Al **emitir** o **revocar** un certificado, la aplicación publica un evento de
+integración (`certificate.issued` / `certificate.revoked`) a **RabbitMQ**, y un
+**worker** separado lo consume y reacciona. El dominio no conoce el broker: se
+usa el puerto `EventPublisher` (Application) con adaptadores en Infrastructure.
+Si no hay `RABBITMQ_URL` (local/CI), se usa un publicador "noop" que solo registra
+el evento, así el sistema funciona sin broker.
 
 ## 📌 El caso
 

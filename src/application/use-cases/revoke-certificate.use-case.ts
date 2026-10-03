@@ -5,6 +5,7 @@ import {
 import { CertificateRepository } from '../../domain/repositories/certificate.repository';
 import { Clock } from '../ports/clock.port';
 import { CertificateLedger } from '../ports/certificate-ledger.port';
+import { EventPublisher } from '../ports/event-publisher.port';
 import {
   LedgerEvent,
   RevokeCertificateInput,
@@ -21,6 +22,7 @@ export class RevokeCertificateUseCase {
     private readonly certificates: CertificateRepository,
     private readonly ledger: CertificateLedger,
     private readonly clock: Clock,
+    private readonly events: EventPublisher,
   ) {}
 
   async execute(input: RevokeCertificateInput): Promise<RevokeCertificateOutput> {
@@ -47,6 +49,14 @@ export class RevokeCertificateUseCase {
     const block = await this.ledger.append(JSON.stringify(event));
 
     await this.certificates.save(certificate);
+
+    await this.events.publish({
+      type: 'certificate.revoked',
+      verificationCode: certificate.verificationCode,
+      institutionId: input.institutionId,
+      reason: input.reason,
+      at: now.toISOString(),
+    });
 
     return {
       verificationCode: certificate.verificationCode,

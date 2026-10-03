@@ -12,6 +12,7 @@ import { InstitutionRepository } from '../../domain/repositories/institution.rep
 import { Block } from '../../domain/value-objects/block';
 import { Clock } from '../ports/clock.port';
 import { CertificateLedger } from '../ports/certificate-ledger.port';
+import { EventPublisher } from '../ports/event-publisher.port';
 import { IssueCertificateUseCase } from './issue-certificate.use-case';
 import { RevokeCertificateUseCase } from './revoke-certificate.use-case';
 import { VerifyCertificateUseCase } from './verify-certificate.use-case';
@@ -59,6 +60,14 @@ class FakeLedger implements CertificateLedger {
 
 const fixedClock = (iso: string): Clock => ({ now: () => new Date(iso) });
 
+// Publicador de eventos de prueba: registra lo publicado, sin broker real.
+class FakeEventPublisher implements EventPublisher {
+  public readonly published: { type: string }[] = [];
+  async publish(event: { type: string }) {
+    this.published.push(event);
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 describe('Casos de uso de CertiChain', () => {
@@ -70,6 +79,7 @@ describe('Casos de uso de CertiChain', () => {
   let issue: IssueCertificateUseCase;
   let verify: VerifyCertificateUseCase;
   let revoke: RevokeCertificateUseCase;
+  let events: FakeEventPublisher;
 
   const uni = new Institution('inst-1', 'Universidad Nacional de Ingeniería', 'Perú');
 
@@ -85,11 +95,12 @@ describe('Casos de uso de CertiChain', () => {
     certificates = new FakeCertificateRepo();
     ledger = new FakeLedger();
     clock = fixedClock('2026-07-17T15:30:00Z');
+    events = new FakeEventPublisher();
     await institutions.save(uni);
 
-    issue = new IssueCertificateUseCase(institutions, certificates, ledger, clock);
+    issue = new IssueCertificateUseCase(institutions, certificates, ledger, clock, events);
     verify = new VerifyCertificateUseCase(certificates, institutions, ledger);
-    revoke = new RevokeCertificateUseCase(certificates, ledger, clock);
+    revoke = new RevokeCertificateUseCase(certificates, ledger, clock, events);
   });
 
   it('emite un certificado anclándolo como bloque (CP-06)', async () => {
@@ -102,6 +113,20 @@ describe('Casos de uso de CertiChain', () => {
     const chain = await ledger.getChain();
     expect(chain).toHaveLength(2);
     expect(chain[1].data).toContain(result.contentHash);
+  });
+
+  it('publica un evento de integración al emitir y al revocar', async () => {
+    const issued = await issue.execute(issueInput);
+    await revoke.execute({
+      verificationCode: issued.verificationCode,
+      institutionId: 'inst-1',
+      reason: 'motivo',
+    });
+
+    expect(events.published.map((e) => e.type)).toEqual([
+      'certificate.issued',
+      'certificate.revoked',
+    ]);
   });
 
   it('rechaza la emisión de una institución inactiva y no toca la cadena (CP-07)', async () => {
